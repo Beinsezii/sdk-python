@@ -1,7 +1,7 @@
-from enum import Enum
+import dataclasses
 from dataclasses import dataclass, field
-from math import cos
-from typing import List, Union, Optional, Callable, Any, Dict, TypeVar, Literal
+from enum import Enum
+from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union
 
 
 class Environment(Enum):
@@ -30,6 +30,7 @@ class ETaskType(Enum):
     IMAGE_CONTROL_NET_PRE_PROCESS = "imageControlNetPreProcess"
     PROMPT_ENHANCE = "promptEnhance"
     AUTHENTICATION = "authentication"
+    MODEL_UPLOAD = "modelUpload"
 
 
 class EPreProcessorGroup(Enum):
@@ -310,36 +311,40 @@ class IImageInference:
                         {
                             "code": "invalidClipSkip",
                             "message": "Invalid value for clipSkip parameter. Layers to skip must be an integer value "
-                                       "between 0 and 2 (Default: 0).",
+                            "between 0 and 2 (Default: 0).",
                             "parameter": "clipSkip",
                             "type": "integer",
                             "min": 0,
                             "max": 2,
                             "default": 0,
                             "documentation": "https://docs.runware.ai/en/image-inference#clipskip",
-                            "taskUUID": self.taskUUID
+                            "taskUUID": self.taskUUID,
                         }
                     ]
                 }
             )
 
     def validate_number_results(self):
-        if self.numberResults is None or not isinstance(self.numberResults,
-                                                        int) or self.numberResults < 1 or self.numberResults > 20:
+        if (
+            self.numberResults is None
+            or not isinstance(self.numberResults, int)
+            or self.numberResults < 1
+            or self.numberResults > 20
+        ):
             raise ValueError(
                 {
                     "errors": [
                         {
                             "code": "invalidNumberResults",
                             "message": "Invalid value for numberResults parameter. The number of images requested "
-                                       "must be an integer value between 1 and 20 (Default: 1).",
+                            "must be an integer value between 1 and 20 (Default: 1).",
                             "parameter": "numberResults",
                             "type": "integer",
                             "min": 1,
                             "max": 20,
                             "default": 1,
                             "documentation": "https://docs.runware.ai/en/image-inference#request-numberresults",
-                            "taskUUID": self.taskUUID
+                            "taskUUID": self.taskUUID,
                         }
                     ]
                 }
@@ -415,6 +420,82 @@ class UploadImageType:
     imageUUID: str
     imageURL: str
     taskUUID: str
+
+
+class ModelID(Enum):
+    SD1 = 1
+    SD2 = 2
+    SDXL = 3
+    SDXLLCM = 4
+    SDXLDistilled = 5
+    SDXLRefiner = 6
+    SD1LCM = 7
+    SD1Distilled = 8
+    SDXLTurbo = 9
+    PlaygroundV2 = 10
+    PixArt = 11
+    PixArtAlpha = 12
+    SVD = 13
+    Pony = 14
+    SDXLLightning = 15
+    SDXLHyper = 16
+    StableCascade = 17
+    SVDXT = 18
+    SD1Hyper = 19
+    PixartE = 20
+    SD3 = 21
+    AuraFlow = 22
+    Hunyuan1 = 23
+    Kolors = 24
+    Flux1S = 25
+    Flux1D = 26
+
+
+class ModelFormat(Enum):
+    Safetensors = 1
+    Pickle = 2
+    Bin = 3
+    Pth = 4
+    HuggingFace = 5
+
+
+class ModelType(Enum):
+    LoRA = "lora"
+    Checkpoint = "checkpoint"
+
+
+@dataclass
+class UploadModel:
+    modelAIR: str
+    modelDownloadUrl: str
+    modelFormatId: ModelFormat | int
+    modelHeroImageUrl: str
+    modelName: str
+    modelType: ModelType | str
+    modelTypeId: ModelID | int
+    modelVersion: str
+    privateModel: bool
+
+    # TODO: internal
+    modelUniqueIdentifier: str
+
+    # TODO: nullable
+    modelComment: str
+    modelPositiveTriggerWords: str
+    modelShortDescription: str
+    modelTags: list[str]
+
+    modelDefaultWeight: float = 0.5
+
+    def as_task_params(self) -> dict[str, Any]:
+        return {
+            k: v.value if isinstance(v, Enum) else v for k, v in dataclasses.asdict(self).items()
+        }
+
+
+@dataclass
+class UploadModelResult:
+    pass
 
 
 # The GetWithPromiseCallBackType is defined using the Callable type from the typing module. It represents a function that takes a dictionary
@@ -544,6 +625,4 @@ class RequireOnlyOne(RequireAtLeastOne):
 
         provided_keys = [key for key in required_keys if key in data]
         if len(provided_keys) > 1:
-            raise ValueError(
-                f"Only one key can be provided: {', '.join(provided_keys)}"
-            )
+            raise ValueError(f"Only one key can be provided: {', '.join(provided_keys)}")

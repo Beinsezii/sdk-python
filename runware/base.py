@@ -1,79 +1,50 @@
-import asyncio
-from doctest import debug
-import json
-from os import error
+import inspect
+import logging
 import os
 import re
-import base64
 import uuid
-import inspect
-from typing import List, Union, Optional, Callable, Any, Dict
+from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-
-from .utils import (
-    BASE_RUNWARE_URLS,
-    delay,
-    getUUID,
-    removeListener,
-    accessDeepObject,
-    getPreprocessorType,
-    getTaskType,
-    fileToBase64,
-    isValidUUID,
-    createImageFromResponse,
-    createImageToTextFromResponse,
-    createEnhancedPromptsFromResponse,
-    RunwareAPIError,
-    RunwareError,
-)
 from .async_retry import asyncRetry
 from .types import (
-    Environment,
-    SdkType,
-    RunwareBaseType,
-    IImage,
-    ILora,
     EControlMode,
-    IControlNetGeneral,
-    IControlNetA,
-    IControlNetCanny,
-    IControlNetHandsAndFace,
-    IControlNet,
-    IControlNetWithUUID,
-    IError,
-    IImageInference,
-    IImageCaption,
-    IImageToText,
-    IImageBackgroundRemoval,
-    IPromptEnhance,
-    IEnhancedPrompt,
-    IImageUpscale,
-    ReconnectingWebsocketProps,
-    UploadImageType,
-    GetWithPromiseCallBackType,
+    Environment,
     EPreProcessorGroup,
-    EPreProcessor,
-    EOpenPosePreProcessor,
-    RequireAtLeastOne,
-    RequireOnlyOne,
-    ListenerType,
-    File,
     ETaskType,
+    File,
+    IControlNetWithUUID,
+    IEnhancedPrompt,
+    IError,
+    IImage,
+    IImageBackgroundRemoval,
+    IImageCaption,
+    IImageInference,
+    IImageToText,
+    IImageUpscale,
+    IPromptEnhance,
+    ListenerType,
+    ReconnectingWebsocketProps,
+    SdkType,
+    UploadImageType,
+    UploadModel,
 )
-
-from typing import List, Optional, Union, Callable, Any, Dict
-from .types import IImage, IError, SdkType, ListenerType
 from .utils import (
-    accessDeepObject,
-    getIntervalWithPromise,
-    removeListener,
+    BASE_RUNWARE_URLS,
     LISTEN_TO_IMAGES_KEY,
+    RunwareAPIError,
+    RunwareError,
+    accessDeepObject,
+    createEnhancedPromptsFromResponse,
+    createImageFromResponse,
+    createImageToTextFromResponse,
+    fileToBase64,
+    getIntervalWithPromise,
+    getPreprocessorType,
+    getUUID,
+    isValidUUID,
+    removeListener,
 )
-
-import logging
-
-from .logging_config import configure_logging
 
 # Configure logging
 # configure_logging(log_level=logging.CRITICAL)
@@ -82,9 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 class RunwareBase:
-    def __init__(
-        self, api_key: str, url: str = BASE_RUNWARE_URLS[Environment.PRODUCTION]
-    ):
+    def __init__(self, api_key: str, url: str = BASE_RUNWARE_URLS[Environment.PRODUCTION]):
         self._ws: Optional[ReconnectingWebsocketProps] = None
         self._listeners: List[ListenerType] = []
         self._apiKey: str = api_key
@@ -159,9 +128,7 @@ class RunwareBase:
         )
         self._invalidAPIkey = None
 
-    async def imageInference(
-        self, requestImage: IImageInference
-    ) -> Union[List[IImage], None]:
+    async def imageInference(self, requestImage: IImageInference) -> Union[List[IImage], None]:
         let_lis: Optional[Any] = None
         request_object: Optional[Dict[str, Any]] = None
         task_uuids: List[str] = []
@@ -183,9 +150,7 @@ class RunwareBase:
 
             if requestImage.controlNet:
                 for control_data in requestImage.controlNet:
-                    any_control_data = (
-                        control_data  # Type cast to access additional attributes
-                    )
+                    any_control_data = control_data  # Type cast to access additional attributes
                     preprocessor = control_data.preprocessor
                     end_step = control_data.end_step
                     start_step = control_data.start_step
@@ -352,15 +317,11 @@ class RunwareBase:
     async def imageCaption(self, requestImageToText: IImageCaption) -> IImageToText:
         try:
             await self.ensureConnection()
-            return await asyncRetry(
-                lambda: self._requestImageToText(requestImageToText)
-            )
+            return await asyncRetry(lambda: self._requestImageToText(requestImageToText))
         except Exception as e:
             raise e
 
-    async def _requestImageToText(
-        self, requestImageToText: IImageCaption
-    ) -> IImageToText:
+    async def _requestImageToText(self, requestImageToText: IImageCaption) -> IImageToText:
         inputImage = requestImageToText.inputImage
 
         image_uploaded = await self.uploadImage(inputImage)
@@ -457,9 +418,7 @@ class RunwareBase:
         if removeImageBackgroundPayload.rgba:
             task_params["rgba"] = removeImageBackgroundPayload.rgba
         if removeImageBackgroundPayload.postProcessMask:
-            task_params["postProcessMask"] = (
-                removeImageBackgroundPayload.postProcessMask
-            )
+            task_params["postProcessMask"] = removeImageBackgroundPayload.postProcessMask
         if removeImageBackgroundPayload.returnOnlyMask:
             task_params["returnOnlyMask"] = removeImageBackgroundPayload.returnOnlyMask
         if removeImageBackgroundPayload.alphaMatting:
@@ -504,9 +463,7 @@ class RunwareBase:
 
             return False
 
-        response = await getIntervalWithPromise(
-            check, debugKey="remove-image-background"
-        )
+        response = await getIntervalWithPromise(check, debugKey="remove-image-background")
 
         lis["destroy"]()
 
@@ -591,9 +548,7 @@ class RunwareBase:
         image_list: List[IImage] = [image]
         return image_list
 
-    async def promptEnhance(
-        self, promptEnhancer: IPromptEnhance
-    ) -> List[IEnhancedPrompt]:
+    async def promptEnhance(self, promptEnhancer: IPromptEnhance) -> List[IEnhancedPrompt]:
         """
         Enhance the given prompt by generating multiple versions of it.
 
@@ -607,9 +562,7 @@ class RunwareBase:
         except Exception as e:
             raise e
 
-    async def _enhancePrompt(
-        self, promptEnhancer: IPromptEnhance
-    ) -> List[IEnhancedPrompt]:
+    async def _enhancePrompt(self, promptEnhancer: IPromptEnhance) -> List[IEnhancedPrompt]:
         """
         Internal method to perform the actual prompt enhancement.
 
@@ -617,7 +570,7 @@ class RunwareBase:
         :return: A list of IEnhancedPrompt objects representing the enhanced versions of the prompt.
         """
         prompt = promptEnhancer.prompt
-        promptMaxLength = getattr(promptEnhancer, 'promptMaxLength', 380)
+        promptMaxLength = getattr(promptEnhancer, "promptMaxLength", 380)
 
         promptVersions = promptEnhancer.promptVersions or 1
 
@@ -687,7 +640,7 @@ class RunwareBase:
             return False  # Use the URL as is
         else:
             # Handle case with no scheme and no netloc
-            if not parsed_url.scheme and not parsed_url.netloc or parsed_url.scheme == 'data':
+            if not parsed_url.scheme and not parsed_url.netloc or parsed_url.scheme == "data":
                 # Check if it's a base64 string (with or without data URI prefix)
                 if file.startswith("data:") or re.match(r"^[A-Za-z0-9+/]+={0,2}$", file):
                     # Assume it's a base64 string (with or without data URI prefix)
@@ -816,8 +769,7 @@ class RunwareBase:
                 images = [
                     img
                     for img in m["data"]
-                    if img.get("taskType") == "imageInference"
-                    and img.get("taskUUID") == taskUUID
+                    if img.get("taskType") == "imageInference" and img.get("taskUUID") == taskUUID
                 ]
 
                 if images:
@@ -825,19 +777,13 @@ class RunwareBase:
                     try:
                         partial_images = [IImage(**image_data) for image_data in images]
                         if onPartialImages:
-                            onPartialImages(
-                                partial_images, None
-                            )  # No error in this case
+                            onPartialImages(partial_images, None)  # No error in this case
                     except Exception as e:
-                        print(
-                            f"Error occurred in user on_partial_images callback function: {e}"
-                        )
+                        print(f"Error occurred in user on_partial_images callback function: {e}")
 
             # Handle error messages
             elif isinstance(m.get("errors"), list):
-                errors = [
-                    error for error in m["errors"] if error.get("taskUUID") == taskUUID
-                ]
+                errors = [error for error in m["errors"] if error.get("taskUUID") == taskUUID]
                 if errors:
                     error = IError(
                         error=True,  # Since this is an error message, we set this to True
@@ -848,9 +794,7 @@ class RunwareBase:
                         parameter=errors[0].get("parameter"),
                         documentation=errors[0].get("documentation"),
                     )
-                    self._globalError = (
-                        error  # Store the first error related to this task
-                    )
+                    self._globalError = error  # Store the first error related to this task
                     if onPartialImages:
                         onPartialImages(
                             [], self._globalError
@@ -866,7 +810,9 @@ class RunwareBase:
             error_check = isinstance(m.get("errors"), list) and any(
                 error.get("taskUUID") == taskUUID for error in m["errors"]
             )
-            error_code_check = True if any([error.get('code') for error in m.get('errors', [])]) else False
+            error_code_check = (
+                True if any([error.get("code") for error in m.get("errors", [])]) else False
+            )
             if error_code_check:
                 self._globalError = IError(
                     error=True,
@@ -931,9 +877,7 @@ class RunwareBase:
 
         return temp_listener
 
-    def handleIncompleteImages(
-        self, taskUUIDs: List[str], error: Any
-    ) -> Optional[List[IImage]]:
+    def handleIncompleteImages(self, taskUUIDs: List[str], error: Any) -> Optional[List[IImage]]:
         """
         Handle scenarios where the requested number of images is not fully received.
 
@@ -942,9 +886,7 @@ class RunwareBase:
         :return: A list of available images if there are more than one, otherwise None.
         :raises: The provided error if there are no or only one image.
         """
-        imagesWithSimilarTask = [
-            img for img in self._globalImages if img["taskUUID"] in taskUUIDs
-        ]
+        imagesWithSimilarTask = [img for img in self._globalImages if img["taskUUID"] in taskUUIDs]
         if len(imagesWithSimilarTask) > 1:
             self._globalImages = [
                 img for img in self._globalImages if img["taskUUID"] not in taskUUIDs
@@ -973,8 +915,10 @@ class RunwareBase:
                 await self.connect()
                 # await asyncio.sleep(2)
 
-        except Exception as e:
-            raise self._invalidAPIkey or "Could not connect to server. Ensure your API key is correct"
+        except Exception:
+            raise (
+                self._invalidAPIkey or "Could not connect to server. Ensure your API key is correct"
+            )
 
     async def getSimililarImage(
         self,
@@ -1007,8 +951,7 @@ class RunwareBase:
             imagesWithSimilarTask = [
                 img
                 for img in self._globalImages
-                if img.get("taskType") == "imageInference"
-                and img.get("taskUUID") in taskUUIDs
+                if img.get("taskType") == "imageInference" and img.get("taskUUID") in taskUUIDs
             ]
             # logger.debug(f"Check # imagesWithSimilarTask: {imagesWithSimilarTask}")
 
@@ -1036,6 +979,54 @@ class RunwareBase:
         return await getIntervalWithPromise(
             check, debugKey="getting images", shouldThrowError=shouldThrowError
         )
+
+    async def uploadModel(self, model: UploadModel):
+        logger.debug("Establishing connection")
+        await self.ensureConnection()
+
+        task_uuid = getUUID()
+        task = {
+            "taskType": ETaskType.MODEL_UPLOAD.value,
+            "taskUUID": task_uuid,
+        } | model.as_task_params()
+
+        logger.debug(f"Created task:\n{task}")
+
+        # TODO: share this with other listeners?
+        await self.send(task)
+
+        logger.debug("Sent task")
+
+        lis = self.globalListener(
+            taskUUID=task_uuid,
+        )
+
+        def check(resolve: Callable, reject: Callable, *_) -> bool:
+            results = self._globalMessages.get(task_uuid)
+            uploaded_model = results[0] if results else None
+
+            if uploaded_model and uploaded_model.get("error"):
+                reject(uploaded_model)
+                return True
+
+            if uploaded_model:
+                del self._globalMessages[task_uuid]
+                resolve(uploaded_model)
+                return True
+
+            return False
+
+        response = await getIntervalWithPromise(check, debugKey="upload-model")
+
+        logger.debug("Got response")
+
+        lis["destroy"]()
+
+        if "code" in response:
+            # This indicates an error response
+            raise RunwareAPIError(response)
+
+        return task
 
     def connected(self) -> bool:
         """
